@@ -13,18 +13,26 @@
 
 ###############################################################################
 # Necessary Check
-
-ifeq ($(AUTOCONF_H),)
-    $(error AUTOCONF_H is not defined)
-endif
-
-ccflags-y += -imacros $(AUTOCONF_H)
-
-ifndef TOP
-    TOP := $(srctree)/..
-endif
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
+
+# for fmradio options
+         MTK_PLATFORM_ID := $(patsubst CONSYS_%,%,$(subst ",,$(CONFIG_MTK_COMBO_CHIP)))
+         ifneq (,$(filter $(CONFIG_MTK_COMBO_CHIP), "CONSYS_6885" "CONSYS_6893"))
+             export CFG_BUILD_CONNAC2=true
+         else
+             export CFG_BUILD_CONNAC2=false
+         endif
+         FM_6631_CHIPS := 6758 6759 6771 6775 6765 6761 3967 6797 6768 6785 8168
+         FM_6635_CHIPS := 6779 6885 6873 6893
+         ifneq ($(filter $(FM_6631_CHIPS), $(MTK_PLATFORM_ID)),)
+             FM_CHIP := mt6631
+         else ifneq ($(filter $(FM_6635_CHIPS), $(MTK_PLATFORM_ID)),)
+             FM_CHIP := mt6635
+         endif
+         export CFG_FM_CHIP_ID=$(MTK_PLATFORM_ID)
+         export CFG_FM_CHIP=$(FM_CHIP)
+
 ###############################################################################
 
 MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
@@ -57,7 +65,7 @@ endif
 ifneq ($(CONFIG_MTK_FMRADIO),)
 
 MODULE_NAME := fmradio_drv
-obj-m += $(MODULE_NAME).o
+obj-y += $(MODULE_NAME).o
 
 ifeq ($(CFG_FM_CHIP),)
     FM_CHIP := mt6631_6635
@@ -143,14 +151,14 @@ $(FM_CHIP)-objs    += core/fm_module.o \
                 core/fm_reg_utils.o
 
 ifeq ($(CFG_BUILD_CONNAC2), true)
-    CONNINFRA_SRC_FOLDER := $(TOP)/vendor/mediatek/kernel_modules/connectivity/conninfra
+    CONNINFRA_SRC_FOLDER := $(srctree)/drivers/misc/mediatek/connectivity/conninfra
 
     ccflags-y += -I$(CONNINFRA_SRC_FOLDER)/include
     ccflags-y += -DCFG_FM_CONNAC2=1
     $(FM_CHIP)-objs += chips/mt6635/pub/mt6635_2_fm_lib.o
     $(FM_CHIP)-objs += plat/conn_infra.o
 else
-    WMT_SRC_FOLDER := $(TOP)/vendor/mediatek/kernel_modules/connectivity/common
+    WMT_SRC_FOLDER := $(srctree)/drivers/misc/mediatek/connectivity/common
     WMT_INCLUDE_PATH := common_main
 
     ccflags-y += -I$(WMT_SRC_FOLDER)/$(WMT_INCLUDE_PATH)/include \

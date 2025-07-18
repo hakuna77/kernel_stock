@@ -97,6 +97,10 @@
 #include <linux/module.h>
 #include <linux/debugfs.h>
 
+/* for pm */
+#include <linux/suspend.h>
+#include <linux/notifier.h>
+
 /* for uevent */
 #include <linux/miscdevice.h>   /* for misc_register, and SYNTH_MINOR */
 #include <linux/kobject.h>
@@ -149,7 +153,20 @@ u_int8_t wlan_perf_monitor_force_enable = FALSE;
 #endif
 
 static struct notifier_block wlan_fb_notifier;
-void *wlan_fb_notifier_priv_data;
+
+static int wlan_fb_notifier_callback(struct notifier_block
+				*self, unsigned long event, void *data);
+
+static int wlan_pm_notifier_callback(struct notifier_block
+				*self, unsigned long event, void *data);
+
+void *wlan_notifier_priv_data;
+static struct notifier_block wlan_fb_notifier = {
+       .notifier_call = wlan_fb_notifier_callback
+};
+static struct notifier_block wlan_pm_notifier = {
+	.notifier_call = wlan_pm_notifier_callback
+};
 
 static struct miscdevice wlan_object;
 /*******************************************************************************
@@ -180,7 +197,7 @@ static uint32_t kalPerMonUpdate(IN struct ADAPTER *prAdapter);
 #define  KGIDT_VALUE(v) v
 #endif
 
-const struct firmware *fw_entry;
+const struct firmware *wifi_fw_entry;
 
 /* Default */
 static uint8_t *apucFwName[] = {
@@ -265,7 +282,7 @@ uint32_t kalFirmwareOpen(IN struct GLUE_INFO *prGlueInfo,
 		 *               "/firmware/image"
 		 * Linux path: "/lib/firmware", "/lib/firmware/update"
 		 */
-		ret = _kalRequestFirmware(&fw_entry, apucNameTable[ucNameIdx],
+		ret = _kalRequestFirmware(&wifi_fw_entry, apucNameTable[ucNameIdx],
 				       prGlueInfo->prDev);
 
 		if (ret) {
@@ -311,7 +328,7 @@ error_open:
 /*----------------------------------------------------------------------------*/
 uint32_t kalFirmwareClose(IN struct GLUE_INFO *prGlueInfo)
 {
-	release_firmware(fw_entry);
+	release_firmware(wifi_fw_entry);
 
 	return WLAN_STATUS_SUCCESS;
 }
@@ -336,12 +353,12 @@ uint32_t kalFirmwareLoad(IN struct GLUE_INFO *prGlueInfo,
 	ASSERT(pu4Size);
 	ASSERT(prBuf);
 
-	if ((fw_entry == NULL) || (fw_entry->size == 0)
-	    || (fw_entry->data == NULL)) {
+	if ((wifi_fw_entry == NULL) || (wifi_fw_entry->size == 0)
+	    || (wifi_fw_entry->data == NULL)) {
 		goto error_read;
 	} else {
-		memcpy(prBuf, fw_entry->data, fw_entry->size);
-		*pu4Size = fw_entry->size;
+		memcpy(prBuf, wifi_fw_entry->data, wifi_fw_entry->size);
+		*pu4Size = wifi_fw_entry->size;
 	}
 
 	return WLAN_STATUS_SUCCESS;
@@ -369,7 +386,7 @@ uint32_t kalFirmwareSize(IN struct GLUE_INFO *prGlueInfo,
 	ASSERT(prGlueInfo);
 	ASSERT(pu4Size);
 
-	*pu4Size = fw_entry->size;
+	*pu4Size = wifi_fw_entry->size;
 
 	return WLAN_STATUS_SUCCESS;
 }
@@ -8017,7 +8034,7 @@ void kalSetRpsMap(IN struct GLUE_INFO *glue, IN unsigned long value)
 int32_t kalPerMonSetForceEnableFlag(uint8_t uFlag)
 {
 	struct GLUE_INFO *prGlueInfo = (struct GLUE_INFO *)
-				       wlan_fb_notifier_priv_data;
+				       wlan_notifier_priv_data;
 
 	wlan_perf_monitor_force_enable = uFlag == 0 ? FALSE : TRUE;
 	DBGLOG(SW4, INFO,
@@ -8037,7 +8054,7 @@ static int wlan_fb_notifier_callback(struct notifier_block
 	struct fb_event *evdata = data;
 	int32_t blank = 0;
 	struct GLUE_INFO *prGlueInfo = (struct GLUE_INFO *)
-				       wlan_fb_notifier_priv_data;
+				       wlan_notifier_priv_data;
 
 	/* If we aren't interested in this event, skip it immediately ... */
 	if ((event != FB_EVENT_BLANK) || !prGlueInfo)
@@ -8071,26 +8088,75 @@ static int wlan_fb_notifier_callback(struct notifier_block
 	return 0;
 }
 
-int32_t kalFbNotifierReg(IN struct GLUE_INFO *prGlueInfo)
+int32_t kalNotifierReg(IN struct GLUE_INFO *prGlueInfo)
 {
 	int32_t i4Ret;
 
-	wlan_fb_notifier_priv_data = prGlueInfo;
 	wlan_fb_notifier.notifier_call = wlan_fb_notifier_callback;
+	wlan_notifier_priv_data = prGlueInfo;
 
 	i4Ret = fb_register_client(&wlan_fb_notifier);
-	if (i4Ret)
+	if (i4Ret) {
 		DBGLOG(SW4, WARN, "Register wlan_fb_notifier failed:%d\n",
 		       i4Ret);
+		return i4Ret;
+	}
 	else
 		DBGLOG(SW4, TRACE, "Register wlan_fb_notifier succeed\n");
+
+	i4Ret = register_pm_notifier(&wlan_pm_notifier);
+	if (i4Ret)
+		DBGLOG(SW4, WARN, "Register wlan_pm_notifier failed:%d\n",
+		       i4Ret);
+	else
+		DBGLOG(SW4, TRACE, "Register wlan_pm_notifier succeed\n");
+	
 	return i4Ret;
 }
 
-void kalFbNotifierUnReg(void)
+static int wlan_pm_notifier_callback(struct notifier_block
+				     *self, unsigned long event, void *data)
+{
+	struct GLUE_INFO *prGlueInfo = (struct GLUE_INFO *)
+				       wlan_notifier_priv_data;
+
+	if (kalHaltTryLock())
+		return NOTIFY_STOP;
+
+	if (kalIsHalted() || !prGlueInfo) {
+		kalHaltUnlock();
+		return NOTIFY_STOP;
+	}
+
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+	case PM_HIBERNATION_PREPARE:
+		if (prGlueInfo->fgIsInSuspendMode)
+			goto out;
+		prGlueInfo->fgIsInSuspendMode = TRUE;
+		wlanSetSuspendMode(prGlueInfo, TRUE);
+		p2pSetSuspendMode(prGlueInfo, TRUE);
+		break;
+	case PM_POST_SUSPEND:
+	case PM_POST_HIBERNATION:
+		if (!prGlueInfo->fgIsInSuspendMode)
+			goto out;
+		prGlueInfo->fgIsInSuspendMode = FALSE;
+		wlanSetSuspendMode(prGlueInfo, FALSE);
+		p2pSetSuspendMode(prGlueInfo, FALSE);
+		break;
+	}
+
+out:
+	kalHaltUnlock();
+	return NOTIFY_DONE;
+}
+
+void kalNotifierUnReg(void)
 {
 	fb_unregister_client(&wlan_fb_notifier);
-	wlan_fb_notifier_priv_data = NULL;
+	unregister_pm_notifier(&wlan_pm_notifier);
+	wlan_notifier_priv_data = NULL;
 }
 
 #if CFG_SUPPORT_DFS
