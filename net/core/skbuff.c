@@ -5053,15 +5053,12 @@ struct sk_buff *skb_vlan_untag(struct sk_buff *skb)
 	}
 
 	skb = skb_share_check(skb, GFP_ATOMIC);
-	if (unlikely(!skb)){
-                printk(KERN_ERR "ADDLOG %s:%d ",__func__,__LINE__);
+	if (unlikely(!skb))
 		goto err_free;
-        }
 
-	if (unlikely(!pskb_may_pull(skb, VLAN_HLEN))){
-          	printk(KERN_ERR "ADDLOG %s:%d ",__func__,__LINE__);
+	/* We may access the two bytes after vlan_hdr in vlan_set_encap_proto(). */
+	if (unlikely(!pskb_may_pull(skb, VLAN_HLEN + sizeof(unsigned short))))
 		goto err_free;
-        }
 
 	vhdr = (struct vlan_hdr *)skb->data;
 	vlan_tci = ntohs(vhdr->h_vlan_TCI);
