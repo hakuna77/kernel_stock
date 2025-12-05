@@ -94,7 +94,7 @@ config SDFAT_SUPPORT_STLOG
 config SDFAT_DEBUG
 	bool "Enable debug features"
 	depends on SDFAT_FS
-	default y
+	default n
 
 config SDFAT_DBG_IOCTL
 	bool "Enable debug-ioctl features"
