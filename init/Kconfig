@@ -842,7 +842,7 @@ config MEMCG_SWAP_ENABLED
 config BLK_CGROUP
 	bool "IO controller"
 	depends on BLOCK
-	default n
+	default y
 	---help---
 	Generic block IO controller cgroup interface. This is the common
 	cgroup interface which should be used by various IO controlling

@@ -94,7 +94,9 @@ struct task_struct *wk_tsk[16] = { 0 };	/* max cpu 16 */
 static unsigned int wk_tsk_bind[16] = { 0 };	/* max cpu 16 */
 static unsigned long long wk_tsk_bind_time[16] = { 0 };	/* max cpu 16 */
 static unsigned long long wk_tsk_kick_time[16] = { 0 };	/* max cpu 16 */
+#ifdef CONFIG_MTK_TICK_BROADCAST_AEE_DUMP
 static char wk_tsk_buf[128] = { 0 };
+#endif
 
 static unsigned long kick_bit;
 static unsigned long rtc_update;
@@ -348,6 +350,7 @@ void wk_start_kick_cpu(int cpu)
 	}
 }
 
+#ifdef CONFIG_MTK_TICK_BROADCAST_AEE_DUMP
 void dump_wdk_bind_info(void)
 {
 	int i = 0;
@@ -393,6 +396,7 @@ void dump_wdk_bind_info(void)
 	tick_broadcast_mtk_aee_dump();
 	timer_list_aee_dump(kick_bit);
 }
+#endif
 
 void kicker_cpu_bind(int cpu)
 {
@@ -553,9 +557,6 @@ static void kwdt_process_kick(int local_bit, int cpu,
 	else
 		printk_deferred("%s", msg_buf);
 
-	if (dump_timeout)
-		dump_wdk_bind_info();
-
 #ifdef CONFIG_LOCAL_WDT
 	printk_deferred("[wdk] cpu:%d, kick local wdt,RT[%lld]\n",
 			cpu, sched_clock());
@@ -579,7 +580,7 @@ static int kwdt_thread(void *arg)
 	for (;;) {
 
 		if (kthread_should_stop()) {
-			pr_info("[wdk] kthread_should_stop do !!\n");
+			pr_debug("[wdk] kthread_should_stop do !!\n");
 			break;
 		}
 
@@ -715,14 +716,14 @@ static int start_kicker(void)
 			int ret = PTR_ERR(wk_tsk[i]);
 
 			wk_tsk[i] = NULL;
-			pr_info("[wdk]kthread_create failed, wdtk-%d\n", i);
+			pr_err("[wdk]kthread_create failed, wdtk-%d\n", i);
 			return ret;
 		}
 		/* wk_cpu_update_bit_flag(i,1); */
 		wk_start_kick_cpu(i);
 	}
 	g_kicker_init = 1;
-	pr_info("[wdk] WDT start kicker done CPU_NR=%d\n", CPU_NR);
+	pr_debug("[wdk] WDT start kicker done CPU_NR=%d\n", CPU_NR);
 	return 0;
 }
 
@@ -923,12 +924,12 @@ static void wdk_work_callback(struct work_struct *work)
 	res = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
 		"watchdog:wdkctrl:online", wk_cpu_callback_online, NULL);
 	if (res < 0)
-		pr_info("[wdk]setup CPUHP_AP_ONLINE_DYN fail %d\n", res);
+		pr_err("[wdk]setup CPUHP_AP_ONLINE_DYN fail %d\n", res);
 
 	res = cpuhp_setup_state_nocalls(CPUHP_BP_PREPARE_DYN,
 		"watchdog:wdkctrl:offline", NULL, wk_cpu_callback_offline);
 	if (res < 0)
-		pr_info("[wdk]setup CPUHP_BP_PREPARE_DYN fail %d\n", res);
+		pr_err("[wdk]setup CPUHP_BP_PREPARE_DYN fail %d\n", res);
 
 	for (i = 0; i < CPU_NR; i++) {
 		if (cpu_online(i)) {
@@ -946,7 +947,7 @@ static void wdk_work_callback(struct work_struct *work)
 #endif
 	cpu_hotplug_enable();
 
-	pr_info("[wdk]init_wk done late_initcall cpus_kick_bit=0x%x -----\n",
+	pr_debug("[wdk]init_wk done late_initcall cpus_kick_bit=0x%x -----\n",
 		cpus_kick_bit);
 
 }
@@ -981,7 +982,7 @@ static int __init init_wk(void)
 	res = queue_work(wdk_workqueue, &wdk_work);
 
 	if (!res)
-		pr_info("[wdk]wdk_work start return:%d!\n", res);
+		pr_err("[wdk]wdk_work start return:%d!\n", res);
 
 	wdt_pm_nb.notifier_call = wdt_pm_notify;
 	register_pm_notifier(&wdt_pm_nb);

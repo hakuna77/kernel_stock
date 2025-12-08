@@ -56,7 +56,7 @@ static int mtkts_ta_debug_log;
 		}                                   \
 	} while (0)
 
-#define tsta_warn(fmt, args...)  pr_notice("[Thermal/TC/TA]" fmt, ##args)
+#define tsta_warn(fmt, args...)  pr_warn("[Thermal/TC/TA]" fmt, ##args)
 
 /* ************************************ */
 /* Weak functions */
@@ -276,7 +276,7 @@ void atm_ctrl_cmd_from_user(void *nl_data, struct tad_nl_msg_t *ret_msg)
 		break;
 
 	default:
-		tsta_warn("bad TA_DAEMON_CTRL_CMD_FROM_USER 0x%x\n",
+		pr_err("bad TA_DAEMON_CTRL_CMD_FROM_USER 0x%x\n",
 							msg->tad_cmd);
 				g_ta_status = g_ta_status | 0x01000000;
 		break;
@@ -320,7 +320,7 @@ static void ta_nl_send_to_user(int pid, int seq, struct tad_nl_msg_t *reply_msg)
 	ret = netlink_unicast(daemo_nl_sk, skb, pid, MSG_DONTWAIT);
 	if (ret < 0) {
 		g_ta_status = g_ta_status | 0x00000010;
-		pr_notice("[%s] send failed %d\n", __func__, ret);
+		pr_err("[%s] send failed %d\n", __func__, ret);
 		return;
 	}
 
@@ -354,7 +354,7 @@ static void ta_nl_data_handler(struct sk_buff *skb)
 	tad_msg = (struct tad_nl_msg_t *)data;
 	if (tad_msg->tad_ret_data_len >= TAD_NL_MSG_MAX_LEN) {
 		g_ta_status = g_ta_status | 0x00000100;
-		tsta_warn("[%s] tad_msg->=ad_ret_data_len=%d\n", __func__,
+		tsta_dprintk("[%s] tad_msg->=ad_ret_data_len=%d\n", __func__,
 		tad_msg->tad_ret_data_len);
 		return;
 	}
@@ -373,15 +373,6 @@ static void ta_nl_data_handler(struct sk_buff *skb)
 
 int wakeup_ta_algo(int flow_state)
 {
-	tsta_dprintk("[%s]g_tad_pid=%d, state=%d\n", __func__, g_tad_pid,
-								flow_state);
-
-	/*Avoid print log too much*/
-	if (g_ta_counter >= 3) {
-		g_ta_counter = 0;
-		if (g_ta_status != 0)
-			tsta_warn("[%s] status: 0x%x\n", __func__, g_ta_status);
-	}
 	g_ta_counter++;
 	if (g_tad_pid != 0) {
 		struct tad_nl_msg_t *tad_msg = NULL;
@@ -403,7 +394,7 @@ int wakeup_ta_algo(int flow_state)
 		kfree(tad_msg);
 		return 0;
 	}
-	tsta_warn("[%s] error,g_tad_pid=0\n", __func__);
+	pr_err("[%s] error,g_tad_pid=0\n", __func__);
 	g_ta_status = g_ta_status | 0x00001000;
 	return -1;
 }
@@ -437,7 +428,7 @@ struct file *file, const char __user *buffer, size_t count, loff_t *data)
 		return count;
 	}
 
-	tsta_warn("%s bad argument\n", __func__);
+	pr_err("%s bad argument\n", __func__);
 
 
 	return -EINVAL;
@@ -546,7 +537,7 @@ static int __init ta_init(void)
 	tsta_dprintk("netlink_kernel_create protol= %d\n", NETLINK_TAD);
 
 	if (daemo_nl_sk == NULL) {
-		tsta_warn("[%s] netlink_kernel_create error\n", __func__);
+		pr_err("[%s] netlink_kernel_create error\n", __func__);
 		g_ta_status = 0x00000001;
 		return -1;
 	}
