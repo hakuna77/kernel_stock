@@ -39,9 +39,7 @@
 #include <adsp_ipi_queue.h>
 #include <audio_ipi_platform.h>
 #include "adsp_helper.h"
-#ifdef CONFIG_MTK_AEE_FEATURE
 #include "adsp_excep.h"
-#endif
 #include "adsp_dvfs.h"
 #include "adsp_clk.h"
 #include "adsp_reg.h"
@@ -58,7 +56,7 @@
 #define pr_fmt(fmt)     "[adsp_dvfs]: " fmt
 
 #define ADSP_DBG(fmt, arg...) pr_debug(fmt, ##arg)
-#define ADSP_INFO(fmt, arg...) pr_debug(fmt, ##arg)
+#define ADSP_INFO(fmt, arg...) pr_info(fmt, ##arg)
 
 #define DRV_Reg32(addr)           readl(addr)
 #define DRV_WriteReg32(addr, val) writel(val, addr)
@@ -117,6 +115,7 @@ static inline ssize_t adsp_force_adsppll_store(struct device *kobj,
 	default:
 		break;
 	}
+	pr_debug("[%s]force in %d(%x)\n", __func__, value, param);
 
 	if (is_adsp_ready(ADSP_A_ID) == 1) {
 		ret = adsp_ipi_send(ADSP_IPI_DVFS_SLEEP, &param,
@@ -136,6 +135,7 @@ static inline ssize_t adsp_spm_req_store(struct device *kobj,
 		return -EINVAL;
 
 	param = SPM_REQ_BASE + value;
+	pr_debug("[%s]set SPM req in %d(%x)\n", __func__, value, param);
 
 	if (is_adsp_ready(ADSP_A_ID) == 1) {
 		ret = adsp_ipi_send(ADSP_IPI_DVFS_SLEEP, &param,
@@ -155,6 +155,7 @@ static inline ssize_t adsp_keep_adsppll_on_store(struct device *kobj,
 		return -EINVAL;
 
 	param = ADSPPLL_ON_BASE + value;
+	pr_debug("[%s] %d(%x)\n", __func__, value, param);
 
 	if (is_adsp_ready(ADSP_A_ID) == 1) {
 		ret = adsp_ipi_send(ADSP_IPI_DVFS_SLEEP, &param,
@@ -350,6 +351,7 @@ void adsp_A_send_spm_request(uint32_t enable)
 {
 	int timeout = 1000;
 
+	pr_debug("req spm source & ddr enable(%d)\n", enable);
 	if (enable) {
 		/* request infra/26M/apsrc/v18/ ddr resource */
 		writel(readl(ADSP_A_DDREN_REQ) | ADSP_SPM_SRC_BITS,
@@ -503,12 +505,12 @@ int adsp_sram_gtable_check(void)
 		     (void *)(ADSP_A_ITCM),
 		     (size_t)ADSP_A_ITCM_SIZE);
 	if (ret) {
-		pr_debug("[%s]memcmp adsp_itcm_gtable != ITCM, ret %d\n",
+		pr_notice("[%s]memcmp adsp_itcm_gtable != ITCM, ret %d\n",
 			  __func__, ret);
 		s = (void *)(ADSP_A_ITCM);
 		for (i = 0; i < ADSP_A_ITCM_SIZE / 4; i++) {
 			if (adsp_itcm_gtable[i] != *s) {
-				pr_debug("[%s]adsp_itcm_gtable[%d](0x%x) != ITCM(0x%x)\n",
+				pr_notice("[%s]adsp_itcm_gtable[%d](0x%x) != ITCM(0x%x)\n",
 					  __func__, i, adsp_itcm_gtable[i], *s);
 				*s = adsp_itcm_gtable[i];
 			}
@@ -522,14 +524,14 @@ int adsp_sram_gtable_check(void)
 		     (void *)(ADSP_A_DTCM),
 		     (size_t)ADSP_A_DTCM_SIZE - ADSP_A_DTCM_SHARE_SIZE);
 	if (ret) {
-		pr_debug("[%s]memcmp adsp_dtcm_gtable != DTCM, ret %d\n",
+		pr_notice("[%s]memcmp adsp_dtcm_gtable != DTCM, ret %d\n",
 			  __func__, ret);
 		s = (void *)(ADSP_A_DTCM);
 		for (i = 0;
 		     i < (ADSP_A_DTCM_SIZE - ADSP_A_DTCM_SHARE_SIZE) / 4;
 		     i++) {
 			if (adsp_dtcm_gtable[i] != *s) {
-				pr_debug("[%s]adsp_dtcm_gtable[%d](0x%x) != DTCM(0x%x)\n",
+				pr_notice("[%s]adsp_dtcm_gtable[%d](0x%x) != DTCM(0x%x)\n",
 					  __func__, i, adsp_dtcm_gtable[i], *s);
 				*s = adsp_dtcm_gtable[i];
 			}

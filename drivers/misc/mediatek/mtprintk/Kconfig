@@ -1,7 +1,7 @@
 
 config PRINTK_MT_PREFIX
 	bool "Prefix cpu_id/status/pid/process_name to each kernel log"
-	default n
+	default y
 	help
 	  PRINTK_MT_PREFIX which is used to control whether to show
 	  process information about this log.

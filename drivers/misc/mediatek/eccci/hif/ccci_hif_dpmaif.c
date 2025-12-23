@@ -108,14 +108,14 @@ TRACE_EVENT(ccci_skb_rx,
 #define DPMA_DRB_LOG(fmt, args...) \
 do { \
 	ccci_dump_write(0, CCCI_DUMP_DPMA_DRB, 0, fmt, ##args); \
-	pr_debug("[ccci]" fmt, ##args); \
+	pr_info("[ccci]" fmt, ##args); \
 } while (0)
 
 #define DPMA_DRB_LOG_TIME(fmt, args...) \
 do { \
 	ccci_dump_write(0, CCCI_DUMP_DPMA_DRB|CCCI_DUMP_TIME_FLAG, \
 			0, fmt, ##args); \
-	pr_debug("[ccci]" fmt, ##args); \
+	pr_info("[ccci]" fmt, ##args); \
 } while (0)
 
 
@@ -856,7 +856,7 @@ static int dpmaif_net_rx_push_thread(void *arg)
 		skb = ccci_skb_dequeue(&queue->skb_list);
 		if (!skb)
 			continue;
-#if defined(MT6297) && defined(CONFIG_MTK_ECCCI_NET_SPEED_MONITOR)
+#ifdef MT6297
 		mtk_ccci_add_dl_pkt_size(skb->len);
 #endif
 
@@ -4331,7 +4331,7 @@ int ccci_dpmaif_hif_init(unsigned char hif_id, unsigned char md_id)
 	hif_ctrl->traffic_monitor.data = (unsigned long)hif_ctrl;
 #endif
 	ccci_hif[hif_id] = (void *)hif_ctrl;
-#if defined(MT6297) && defined(CONFIG_MTK_ECCCI_NET_SPEED_MONITOR)
+#ifdef MT6297
 	mtk_ccci_speed_monitor_init();
 #endif
 	return 0;

@@ -266,9 +266,9 @@ static int get_devinfo(void)
 	if (rtc_dev) {
 		err = rtc_read_time(rtc_dev, &tm);
 		if (err < 0)
-			pr_debug("fail to read time\n");
+			pr_info("fail to read time\n");
 	} else
-		pr_debug("[systimer] rtc_class_open rtc_dev fail\n");
+		pr_info("[systimer] rtc_class_open rtc_dev fail\n");
 
 	val = (int *)&eem_devinfo;
 
@@ -383,7 +383,6 @@ static int get_devinfo(void)
 	 * One-line
 	 */
 
-#ifdef CONFIG_MTK_RAM_CONSOLE
 	/* CCI */
 	aee_rr_rec_ptp_devinfo_3((unsigned int) pi_efuse_idx[0].orig_mdes_bdes);
 	aee_rr_rec_ptp_devinfo_4((unsigned int) pi_efuse_idx[0].orig_mtdes);
@@ -407,7 +406,6 @@ static int get_devinfo(void)
 
 	/* Big_Low */
 	aee_rr_rec_ptp_cpu_2_little_volt_1(pi_efuse_idx[4].orig_mbb);
-#endif
 #endif
 #endif
 
