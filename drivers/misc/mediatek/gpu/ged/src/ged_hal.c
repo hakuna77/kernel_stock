@@ -205,7 +205,7 @@ static ssize_t opp_logs_show(struct kobject *kobj,
 		char *buf)
 {
 	int len;
-	int i;
+	int i, j;
 	int cur_idx;
 	unsigned int ui32FqCount;
 	struct GED_DVFS_OPP_STAT *report;
